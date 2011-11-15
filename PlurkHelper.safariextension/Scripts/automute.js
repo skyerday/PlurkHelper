@@ -14,26 +14,57 @@
 // ver 0.6 (2011/11/05) * Add UI in Plurk. Click Muter in Plurk title to show setting.
 // ver 0.7 (2011/11/09) * Name changed. Add Favor function. You can add plurk to favor. The favor is saving in local, and is different than like for Plurk function.
 // ver 0.8 (2011/11/09) * The mute will auto refresh to unmute. Fix javascript error.
+// ver 0.9 (2011/11/15) * Add import/export. Change some code flow.
 // ==/UserScript==
 
-ver = "V8";
+ver = "V9";
 
 (function(){
     if (window.top === window) {
-        var jq = document.createElement('script');
-        jq.src = 'http://dl.dropbox.com/u/5298691/jquery.js';
-        document.getElementsByTagName('head')[0].appendChild(jq);
         var css = document.createElement('link');
-        css.href = 'http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css';
+        css.href = 'http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/base/jquery-ui.css';
         css.type = 'text/css';
         css.rel = 'stylesheet';
         document.getElementsByTagName('head')[0].appendChild(css);
+        onJQCSSLoaded();
     }
 })();
 
 var myWindow = (typeof unsafeWindow == 'undefined') ? window : unsafeWindow;
 
+function onJQCSSLoaded() {
+    var jq = document.createElement('script');
+    jq.src = 'http://ajax.googleapis.com/ajax/libs/jquery/1.7.0/jquery.js';
+    jq.addEventListener('load', onJQLoaded, true);
+    document.getElementsByTagName('head')[0].appendChild(jq);    
+}
+
+function onJQLoaded() {
+    myWindow.jQuery.acceptData = function(elem) {
+        if ( elem.nodeName ) {
+            var jq = typeof myWindow.jq != 'undefined' ? myWindow.jq : myWindow.jQuery;
+            var match = typeof elem.nodeName != 'string' ? false : jq.noData[ elem.nodeName.toLowerCase() ];
+
+            if ( match ) {
+                return !(match === true || elem.getAttribute("classid") !== match);
+            }
+        }
+
+        return true;
+    }
+
+    var jq = document.createElement('script');
+    jq.src = 'http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.js';
+    jq.type = 'text/javascript';
+    document.getElementsByTagName('head')[0].appendChild(jq);
+    jq.addEventListener("load", onJQUILoaded, true);
+}
+
 function onJQUILoaded() {
+    console.log('UI loaded');
+    myWindow.jq = myWindow.jQuery.noConflict(true);
+    //myWindow.jQuery = myWindow.jq;
+
     myWindow.signread = false;
     myWindow.shelpersetting = undefined;
 
@@ -50,22 +81,6 @@ function onJQUILoaded() {
     injectMuter(myWindow.jq);
     myWindow.setTimeout(doRTE, 100, myWindow.jq);        
 }
-
-function waitJQ() {
-    if(typeof myWindow.jQuery == 'undefined') {
-        myWindow.setTimeout(waitJQ,100);
-    } else {
-        myWindow.jq = myWindow.jQuery.noConflict(true);
-        myWindow.jQuery = myWindow.jq;
-        var jq = document.createElement('script');
-        jq.src = 'https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.js';
-        jq.type = 'text/javascript';
-        document.getElementsByTagName('head')[0].appendChild(jq);
-        jq.addEventListener("load", onJQUILoaded, true);
-    }
-}
-
-waitJQ();
 
 if (typeof GM_getValue == 'undefined') {
     GM_getValue = function(key) {
@@ -108,9 +123,11 @@ function initFavorList(favor) {
     favorcontainer = JSON.parse(favor);
     myWindow.jq('div#tab2 tbody tr').detach();
     var tbody = myWindow.jq('div#tab2 tbody');
+    var i = 0;
     for (var k in favorcontainer) {
         var item = favorcontainer[k];
-        tbody.append('<tr><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
+        var twiclass = (i++) % 2 ? 'twilight1' : 'twilight2';
+        tbody.append('<tr class="'+twiclass+'"><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
     }    
 }
 
@@ -128,6 +145,7 @@ function injectMuter($) {
         $('#mutertab').tabs();
         myWindow.jq('#shelpersetting').css('display', '');
     });
+    $('head').append('<style>.twilight1 {background-color: #FFFFFF;} .twilight2 {background-color: #EEEEEE;}</style>');
     $('body').append(
         '<script type="text/javascript">function closeSetting(){window.jq(\'#shelpersetting\').css({\'display\':\'none\'});}' +
         '   function updateSetting() {var list = document.getElementById("keywords"); var setting = ""; for (var i=0; i<list.length; ++i) { setting = setting + "," + list.options[i].text; } if (setting.length > 0) setting = setting.substring(1, setting.length); window.shelpersetting = "{\\"mutersetting\\":\\""+setting+"\\"}"; window.signread = true;}' +
@@ -151,13 +169,30 @@ function injectMuter($) {
         '<br><button id="clearFavor" type="button">Clear</button>' +
         '</div>' +
         '</div>' +
-        '<button name="close" id="close" type="button" onClick="closeSetting()">Close</button>' +        
+        '<button name="close" id="close" type="button" onClick="closeSetting()">Close</button>' +
+        '<button id="edit" type="button">Export/Import</button>' +
         '&nbsp;&nbsp;&nbsp;&nbsp;by Skyer 2011' +
         '</div>');
     $('#clearFavor').click(function() {
         favorcontainer = {};
         $('div#tab2 tbody tr').detach(); 
         updateFavor();
+    });
+
+    $('button#edit').click(function() {
+        var result = window.prompt("Export / Import helper settings.", JSON.stringify(globalsetting));
+        var parsed = undefined;
+        try {
+            parsed = JSON.parse(result);
+        } catch (exception) {
+            parsed = undefined;
+        }
+
+        if (typeof parsed != 'undefined') {
+            globalsetting = parsed;
+            var span = myWindow.jq('#proxy_for_data');
+            span.text(JSON.stringify(globalsetting));
+        }
     });
 
     myWindow.renderManagerOrig = myWindow.Plurks._renderManager;
@@ -167,30 +202,33 @@ function injectMuter($) {
         var id = getEncodedId(myWindow.$dp.hover_div.id);
         var heart = (id in favorcontainer) ? '♥' : '♡';
         $('.manager').append('<a id="pfavor" href="#" class="action">'+heart+'Favor</a>');
-        $('#pfavor').click(function() {
-            var cdiv = myWindow.$dp.hover_div;
-            var id = getEncodedId(cdiv.id);
+        // $('#pfavor').click(function() {
+        //     var cdiv = myWindow.$dp.hover_div;
+        //     var id = getEncodedId(cdiv.id);
 
-            if (id in favorcontainer) {
-                delete favorcontainer[id];
-                initFavorList(escape(JSON.stringify(favorcontainer)));
-                $('.manager a#pfavor').text('♡Favor');
-            } else {
-                var link = 'http://www.plurk.com/p/'+id;
-                var name = $('div#'+cdiv.id+' a.name').text();
-                var text = $('div#'+cdiv.id+' div.text_holder').text();
-                var item = {'link':link, 'name':name, 'text':text};
-                favorcontainer[id] = item;
-                $('div#tab2 tbody').append('<tr><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
-                $('.manager a#pfavor').text('♥Favor');
-            }
+        //     if (id in favorcontainer) {
+        //         delete favorcontainer[id];
+        //         initFavorList(escape(JSON.stringify(favorcontainer)));
+        //         $('.manager a#pfavor').text('♡Favor');
+        //     } else {
+        //         var link = 'http://www.plurk.com/p/'+id;
+        //         var name = $('div#'+cdiv.id+' a.name').text();
+        //         var text = $('div#'+cdiv.id+' div.text_holder').text();
+        //         var item = {'link':link, 'name':name, 'text':text};
+        //         console.log('Length: ' + favorcontainer.length);
+        //         //var twiclass = (favorcontainer.length % 2) ? 'twilight1' : 'twilight2';
+        //         favorcontainer[id] = item;
+        //         //$('div#tab2 tbody').append('<tr class="'+twiclass+'"><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
+        //         $('.manager a#pfavor').text('♥Favor');
+        //         initFavorList(escape(JSON.stringify(favorcontainer)));
+        //     }
 
-            setTimeout(function(){
-                updateFavor();
-            }, 100);
+        //     setTimeout(function(){
+        //         updateFavor();
+        //     }, 100);
 
-            return false;
-        });
+        //     return false;
+        // });
     };
     fetchKeywords(GM_getValue('mutersetting'), true);
     initFavorList(GM_getValue('favor'));
