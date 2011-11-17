@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name       Plurk Helper
-// @version    0.8
+// @version    0.11
 // @description  Plurk helper functions to enhance web Plurk UI.
 // @include    http://www.plurk.com/*
 // @copyright  2011+, Skyer
@@ -16,9 +16,10 @@
 // ver 0.8  (2011/11/09) * The mute will auto refresh to unmute. Fix javascript error.
 // ver 0.9  (2011/11/15) * Add import/export. Change some code flow.
 // ver 0.10 (2011/11/17) * Add delete favor in settings. Change to use localStorage.
+// ver 0.11 (2011/11/17) * Fix JS error in Chrome.
 // ==/UserScript==
 
-ver = "V10";
+ver = "V11";
 
 (function(){
     if (window.top === window) {
@@ -66,7 +67,14 @@ function onJQLoaded() {
 function onJQUILoaded() {
     myWindow.jq = myWindow.jQuery.noConflict(true);
 
-    globalsetting = JSON.parse(localStorage.gmgetsetting);
+    globalsetting = undefined;
+    
+    try {
+        globalsetting = JSON.parse(localStorage.gmgetsetting);
+    } catch (e) {
+        ;
+    }
+    
     if (globalsetting == undefined)
         globalsetting = {};
 
