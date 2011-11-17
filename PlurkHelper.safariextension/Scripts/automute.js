@@ -40,6 +40,8 @@ function onJQCSSLoaded() {
 }
 
 function onJQLoaded() {
+    // Patch the jQuery function to avoid js error in Plurk.
+    // Plurk overwrite the nodeName property to a function in window.
     myWindow.jQuery.acceptData = function(elem) {
         if ( elem.nodeName ) {
             var jq = typeof myWindow.jq != 'undefined' ? myWindow.jq : myWindow.jQuery;
@@ -202,33 +204,33 @@ function injectMuter($) {
         var id = getEncodedId(myWindow.$dp.hover_div.id);
         var heart = (id in favorcontainer) ? '♥' : '♡';
         $('.manager').append('<a id="pfavor" href="#" class="action">'+heart+'Favor</a>');
-        // $('#pfavor').click(function() {
-        //     var cdiv = myWindow.$dp.hover_div;
-        //     var id = getEncodedId(cdiv.id);
+        $('#pfavor').click(function() {
+            var cdiv = myWindow.$dp.hover_div;
+            var id = getEncodedId(cdiv.id);
 
-        //     if (id in favorcontainer) {
-        //         delete favorcontainer[id];
-        //         initFavorList(escape(JSON.stringify(favorcontainer)));
-        //         $('.manager a#pfavor').text('♡Favor');
-        //     } else {
-        //         var link = 'http://www.plurk.com/p/'+id;
-        //         var name = $('div#'+cdiv.id+' a.name').text();
-        //         var text = $('div#'+cdiv.id+' div.text_holder').text();
-        //         var item = {'link':link, 'name':name, 'text':text};
-        //         console.log('Length: ' + favorcontainer.length);
-        //         //var twiclass = (favorcontainer.length % 2) ? 'twilight1' : 'twilight2';
-        //         favorcontainer[id] = item;
-        //         //$('div#tab2 tbody').append('<tr class="'+twiclass+'"><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
-        //         $('.manager a#pfavor').text('♥Favor');
-        //         initFavorList(escape(JSON.stringify(favorcontainer)));
-        //     }
+            if (id in favorcontainer) {
+                delete favorcontainer[id];
+                initFavorList(escape(JSON.stringify(favorcontainer)));
+                $('.manager a#pfavor').text('♡Favor');
+            } else {
+                var link = 'http://www.plurk.com/p/'+id;
+                var name = $('div#'+cdiv.id+' a.name').text();
+                var text = $('div#'+cdiv.id+' div.text_holder').text();
+                var item = {'link':link, 'name':name, 'text':text};
+                console.log('Length: ' + favorcontainer.length);
+                //var twiclass = (favorcontainer.length % 2) ? 'twilight1' : 'twilight2';
+                favorcontainer[id] = item;
+                //$('div#tab2 tbody').append('<tr class="'+twiclass+'"><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
+                $('.manager a#pfavor').text('♥Favor');
+                initFavorList(escape(JSON.stringify(favorcontainer)));
+            }
 
-        //     setTimeout(function(){
-        //         updateFavor();
-        //     }, 100);
+            setTimeout(function(){
+                updateFavor();
+            }, 100);
 
-        //     return false;
-        // });
+            return false;
+        });
     };
     fetchKeywords(GM_getValue('mutersetting'), true);
     initFavorList(GM_getValue('favor'));
