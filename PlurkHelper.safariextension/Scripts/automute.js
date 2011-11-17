@@ -6,18 +6,19 @@
 // @copyright  2011+, Skyer
 // @author     Skyer
 // Reference : http://userscripts.org/scripts/review/112835
-// ver 0.1 (2011/9/16)  * First version.
-// ver 0.2 (2011/9/17)  * Add FireFox support.
-// ver 0.3 (2011/9/20)  * Support account name for the keyword. Ex: http://www.plurk.com/off60, you can assign off60 for blockList item.
-// ver 0.4 (2011/11/01) * Change to Safari extension format. Remove blockList. It will be added outside.
-// ver 0.5 (2011/11/04) * Fix error in FF && Chrome
-// ver 0.6 (2011/11/05) * Add UI in Plurk. Click Muter in Plurk title to show setting.
-// ver 0.7 (2011/11/09) * Name changed. Add Favor function. You can add plurk to favor. The favor is saving in local, and is different than like for Plurk function.
-// ver 0.8 (2011/11/09) * The mute will auto refresh to unmute. Fix javascript error.
-// ver 0.9 (2011/11/15) * Add import/export. Change some code flow.
+// ver 0.1  (2011/9/16)  * First version.
+// ver 0.2  (2011/9/17)  * Add FireFox support.
+// ver 0.3  (2011/9/20)  * Support account name for the keyword. Ex: http://www.plurk.com/off60, you can assign off60 for blockList item.
+// ver 0.4  (2011/11/01) * Change to Safari extension format. Remove blockList. It will be added outside.
+// ver 0.5  (2011/11/04) * Fix error in FF && Chrome
+// ver 0.6  (2011/11/05) * Add UI in Plurk. Click Muter in Plurk title to show setting.
+// ver 0.7  (2011/11/09) * Name changed. Add Favor function. You can add plurk to favor. The favor is saving in local, and is different than like for Plurk function.
+// ver 0.8  (2011/11/09) * The mute will auto refresh to unmute. Fix javascript error.
+// ver 0.9  (2011/11/15) * Add import/export. Change some code flow.
+// ver 0.10 (2011/11/17) * Add delete favor in settings. Change to use localStorage.
 // ==/UserScript==
 
-ver = "V9";
+ver = "V10";
 
 (function(){
     if (window.top === window) {
@@ -63,40 +64,28 @@ function onJQLoaded() {
 }
 
 function onJQUILoaded() {
-    console.log('UI loaded');
     myWindow.jq = myWindow.jQuery.noConflict(true);
-    //myWindow.jQuery = myWindow.jq;
 
-    myWindow.signread = false;
-    myWindow.shelpersetting = undefined;
-
-    try {
-        if (typeof myWindow.gmgetsetting != 'undefined' && myWindow.gmgetsetting.length > 0)
-            globalsetting = JSON.parse(myWindow.gmgetsetting);
-        else
-            globalsetting = {};
-    } catch (err) {
-        console.log('error: ' + err);
+    globalsetting = JSON.parse(localStorage.gmgetsetting);
+    if (globalsetting == undefined)
         globalsetting = {};
-    }
 
     injectMuter(myWindow.jq);
     myWindow.setTimeout(doRTE, 100, myWindow.jq);        
 }
 
-if (typeof GM_getValue == 'undefined') {
-    GM_getValue = function(key) {
-        return globalsetting[key];
-    };
+function updateLocalStorage() {
+    localStorage.gmgetsetting = JSON.stringify(globalsetting);
 }
 
-if (typeof GM_setValue == 'undefined') {
-    GM_setValue = function(key, value) {
-        globalsetting[key] = value;
-        var span = myWindow.jq('#proxy_for_data');
-        span.text(JSON.stringify(globalsetting));
-    };
-}
+GM_getValue = function(key) {
+    return globalsetting[key];
+};
+
+GM_setValue = function(key, value) {
+    globalsetting[key] = value;
+    updateLocalStorage();
+};
 
 function fetchKeywords(keyword, ui) {
     if (typeof keyword == 'undefined' || keyword.length <= 0) return;
@@ -129,8 +118,16 @@ function initFavorList(favor) {
     for (var k in favorcontainer) {
         var item = favorcontainer[k];
         var twiclass = (i++) % 2 ? 'twilight1' : 'twilight2';
-        tbody.append('<tr class="'+twiclass+'"><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
+        tbody.append('<tr class="'+twiclass+'"><td align="left">'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td><td align="right"><a href="#" id="delFavor_'+k+'">X</a></td></tr>');
     }    
+
+    myWindow.jq('#tab2 a[id*=delFavor]').click(function(){
+        var id = myWindow.jq(this).attr('id').split('_')[1];
+        delete favorcontainer[id];
+        initFavorList(escape(JSON.stringify(favorcontainer)));
+        updateFavor();
+        updateLocalStorage();
+    });
 }
 
 function updateFavor() {
@@ -141,40 +138,43 @@ function getEncodedId(id) {
     return (parseInt(id.substring(1, id.length), 10)).toString(36);
 }
 
-function injectMuter($) {
-    $('#top_bar td').append('<a id="plurkmuter" href="#" class="item">SHelper'+ver+'</a>');
+function updateSetting() {
+    var list = document.getElementById("keywords"); 
+    var setting = ""; 
+    for (var i=0; i<list.length; ++i) { 
+        setting = setting + "," + list.options[i].text; 
+    } 
+    if (setting.length > 0) 
+        setting = setting.substring(1, setting.length); 
+    GM_setValue('mutersetting', setting);
+}
+
+function initEventListener() {
+    var $ = myWindow.jq;
+    $('button#add').click(function(){
+        var list = document.getElementById("keywords"); 
+        var input = document.getElementById("keyword"); 
+        var option = document.createElement("option"); 
+        option.text = input.value; 
+        list.add(option, null); 
+        updateSetting();
+    });
+    $('button#delkeys').click(function(){
+        var list = document.getElementById("keywords"); 
+        var index = list.selectedIndex; 
+        if (index == -1) return; 
+        list.remove(index); 
+        updateSetting(); 
+    });
+    $('button#close').click(function(){
+        myWindow.jq('#shelpersetting').css({'display':'none'});
+    });
+
     $('#plurkmuter').click(function(){
         $('#mutertab').tabs();
         myWindow.jq('#shelpersetting').css('display', '');
     });
-    $('head').append('<style>.twilight1 {background-color: #FFFFFF;} .twilight2 {background-color: #EEEEEE;}</style>');
-    $('body').append(
-        '<script type="text/javascript">function closeSetting(){window.jq(\'#shelpersetting\').css({\'display\':\'none\'});}' +
-        '   function updateSetting() {var list = document.getElementById("keywords"); var setting = ""; for (var i=0; i<list.length; ++i) { setting = setting + "," + list.options[i].text; } if (setting.length > 0) setting = setting.substring(1, setting.length); window.shelpersetting = "{\\"mutersetting\\":\\""+setting+"\\"}"; window.signread = true;}' +
-        '   function onAddClick() {var list = document.getElementById("keywords"); var input = document.getElementById("keyword"); var option = document.createElement("option"); option.text = input.value; list.add(option, null); updateSetting();}' +
-        '   function onDelClick() {var list = document.getElementById("keywords"); var index = list.selectedIndex; if (index == -1) return; list.remove(index); updateSetting();} ' +
-        '</script>' +
-        '<div id="shelpersetting" style="color: #000000; position:absolute; top:100px; left:100px; background-color:#FFFFFF; width: 500px; height: 400px; z-index: 5000; display: none;">' +
-        '<div id="mutertab" style="height:350px; overflow: auto; ">' +
-        '<ul><li><a href="#mutersetting"><span>Muter</span></a></li>' +
-        '<li><a href="#tab2"><span>Favor</span></a></li></ul>' +
-        '<div id="mutersetting">' +
-        '<p>Auto mute plurks with matched keywords</p>' +
-        '<form>' +
-        'Keyword: <input name="keyword" id="keyword" /> <button name="add" id="add" type="button" onClick="onAddClick();">Add</button>' +
-        '<button name="delkey" id="delkeys" type="button" onClick="onDelClick();">Delete</button><br>' +
-        '<select name="keywords" id="keywords" multiple="multiple" size="10" width="300" style="width: 300px;"></select> <br>' +
-        '</form>' +
-        '</div>' + 
-        '<div id="tab2">' +
-        '<table><thead><tr><th width="100px">Name</th><th width="350px">Title</th></tr></thead><tbody></tbody></table>' +
-        '<br><button id="clearFavor" type="button">Clear</button>' +
-        '</div>' +
-        '</div>' +
-        '<button name="close" id="close" type="button" onClick="closeSetting()">Close</button>' +
-        '<button id="edit" type="button">Export/Import</button>' +
-        '&nbsp;&nbsp;&nbsp;&nbsp;by Skyer 2011' +
-        '</div>');
+
     $('#clearFavor').click(function() {
         favorcontainer = {};
         $('div#tab2 tbody tr').detach(); 
@@ -192,11 +192,13 @@ function injectMuter($) {
 
         if (typeof parsed != 'undefined') {
             globalsetting = parsed;
-            var span = myWindow.jq('#proxy_for_data');
-            span.text(JSON.stringify(globalsetting));
+            updateLocalStorage();
         }
     });
+}
 
+function hackPlurk() {
+    var $ = myWindow.jq;
     myWindow.renderManagerOrig = myWindow.Plurks._renderManager;
     myWindow.Plurks._renderManager = function(a) {
         myWindow.renderManagerOrig(a);
@@ -217,10 +219,7 @@ function injectMuter($) {
                 var name = $('div#'+cdiv.id+' a.name').text();
                 var text = $('div#'+cdiv.id+' div.text_holder').text();
                 var item = {'link':link, 'name':name, 'text':text};
-                console.log('Length: ' + favorcontainer.length);
-                //var twiclass = (favorcontainer.length % 2) ? 'twilight1' : 'twilight2';
                 favorcontainer[id] = item;
-                //$('div#tab2 tbody').append('<tr class="'+twiclass+'"><td>'+item.name+'</td><td><a target="_blank" href="'+item.link+'">'+item.text+'</a></td></tr>');
                 $('.manager a#pfavor').text('♥Favor');
                 initFavorList(escape(JSON.stringify(favorcontainer)));
             }
@@ -232,23 +231,43 @@ function injectMuter($) {
             return false;
         });
     };
+}
+
+function injectMuter($) {
+    $('#top_bar td').append('<a id="plurkmuter" href="#" class="item">SHelper'+ver+'</a>');
+    $('head').append('<style>.twilight1 {background-color: #FFFFFF;} .twilight2 {background-color: #EEEEEE;}</style>');
+    $('body').append(
+        '<div id="shelpersetting" style="color: #000000; position:absolute; top:100px; left:100px; background-color:#FFFFFF; width: 500px; height: 400px; z-index: 5000; display: none;">' +
+        '<div id="mutertab" style="height:350px; overflow: auto; ">' +
+        '<ul><li><a href="#mutersetting"><span>Muter</span></a></li>' +
+        '<li><a href="#tab2"><span>Favor</span></a></li></ul>' +
+        '<div id="mutersetting">' +
+        '<p>Auto mute plurks with matched keywords</p>' +
+        '<form>' +
+        'Keyword: <input name="keyword" id="keyword" /> <button name="add" id="add" type="button">Add</button>' +
+        '<button name="delkey" id="delkeys" type="button">Delete</button><br>' +
+        '<select name="keywords" id="keywords" multiple="multiple" size="10" width="300" style="width: 300px;"></select> <br>' +
+        '</form>' +
+        '</div>' + 
+        '<div id="tab2">' +
+        '<table><thead><tr><th width="100px">Name</th><th width="350px">Title</th><th></th>&nbsp;</tr></thead><tbody></tbody></table>' +
+        '<br><button id="clearFavor" type="button">Clear</button>' +
+        '</div>' +
+        '</div>' +
+        '<button name="close" id="close" type="button">Close</button>' +
+        '<button id="edit" type="button">Export/Import</button>' +
+        '&nbsp;&nbsp;&nbsp;&nbsp;by Skyer 2011' +
+        '</div>');
+
+    initEventListener();
+
+    hackPlurk();
+
     fetchKeywords(GM_getValue('mutersetting'), true);
     initFavorList(GM_getValue('favor'));
 }
 
 function doRTE($) {
-    if (myWindow.signread == true) {
-        var setting = $.parseJSON(myWindow.shelpersetting);
-        myWindow.signread = false;
-        console.log('fetch settings from UI');
-        for (k in setting) {
-            var v = setting[k];
-            GM_setValue(k, v);
-            if (k  == 'mutersetting')
-                fetchKeywords(v, false);
-        }
-    }
-
     var blockList = typeof outSideBlockList == 'undefined' ? undefined : outSideBlockList;
     if (typeof blockList == 'undefined') {
         myWindow.setTimeout(doRTE, 2000, $);
