@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name       Plurk Helper
-// @version    0.11
+// @version    0.12
 // @description  Plurk helper functions to enhance web Plurk UI.
 // @include    http://www.plurk.com/*
 // @copyright  2011+, Skyer
@@ -17,9 +17,10 @@
 // ver 0.9  (2011/11/15) * Add import/export. Change some code flow.
 // ver 0.10 (2011/11/17) * Add delete favor in settings. Change to use localStorage.
 // ver 0.11 (2011/11/17) * Fix JS error in Chrome.
+// ver 0.12 (2012/6/05)  * Fix JS error in Chrome. ($dp not found)
 // ==/UserScript==
 
-ver = "V11";
+ver = "V12";
 
 (function(){
     if (window.top === window) {
@@ -319,7 +320,7 @@ function doRTE($) {
                     console.log('Mute ' + plurk_id + ', ' + textName + " (" + urlName + ")");
                     set_mute( plurk_id , 2 );
                     me.addClass('muted');
-                    $dp.mute_link.innerText = _('unmute');
+                    myWindow.$dp.mute_link.innerText = myWindow._('unmute');
                     myWindow.PlurkMetaData.muted[plurk_id] = true;
                     myWindow.$plurks['p'+plurk_id].obj.is_unread = 2;
                 }
